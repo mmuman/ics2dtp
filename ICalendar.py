@@ -269,15 +269,23 @@ def InsertICalendarTimeTable( ):
             cursor.CharWeight = FontWeight.BOLD
             text.insertString( cursor, "%s %d\n" % (last_date.strftime("%A"), last_date.day), 0 )
             cursor.CharWeight = FontWeight.NORMAL
-        cursor.CharWeight = FontWeight.BOLD
-        text.insertString( cursor, "\t%s" % start.time().strftime("%H:%M"), 0 )
+        #cursor.CharWeight = FontWeight.BOLD
+        #startTime = start.time().strftime("%Hh%M").replace('h00','h')
+        #text.insertString( cursor, "\t%s" % startTime, 0 )
         cursor.CharWeight = FontWeight.NORMAL
-        cursor.CharPosture = FontSlant.ITALIC
+        cursor.CharPosture = FontSlant.NONE
+        #cursor.CharPosture = FontSlant.ITALIC
         summary = ""
+        subtitle = ""
         if 'SUMMARY' in comp:
             summary = comp['SUMMARY']
-            text.insertString( cursor, " %s\r" % summary, 0 )
+            text.insertString( cursor, "%s" % summary, 0 )
             cursor.CharPosture = FontSlant.NONE
+        cursor.CharWeight = FontWeight.BOLD
+        startTime = start.time().strftime("%Hh%M").replace('h00','h')
+        text.insertString( cursor, " - %s" % startTime, 0 )
+        cursor.CharWeight = FontWeight.NORMAL
+        text.insertString( cursor, "\r", 0 )
         #if 'DESCRIPTION' in comp:
         #    text.insertString( cursor, "%s\n" % comp['DESCRIPTION'], 0 )
         statusDone += 50/len(events)
@@ -287,3 +295,4 @@ def InsertICalendarTimeTable( ):
 
 g_exportedScripts = InsertICalendar, InsertICalendarTimeTable,
 
+# vim: set shiftwidth=4 softtabstop=4 expandtab:
