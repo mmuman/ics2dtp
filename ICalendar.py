@@ -1,4 +1,4 @@
-###!/usr/bin/python
+#!/usr/bin/env python3
 # HelloWorld python script for the scripting framework
 
 import uno
