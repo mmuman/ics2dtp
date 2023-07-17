@@ -21,6 +21,20 @@ from com.sun.star.lang import XMain
 # http://hydrogeotools.blogspot.fr/2014/03/libreoffice-and-python-macros.html
 # http://openoffice3.web.fc2.com/Python_Macro_General_No6.html
 
+# https://ask.libreoffice.org/t/paste-html-content-using-api/89749/4
+def InsertHtml2Odt_3(sHTML, doc):
+    oStream = ctx.ServiceManager.createInstanceWithContext("com.sun.star.io.SequenceInputStream", ctx)
+    oStream.initialize((uno.ByteSequence(sHTML.encode()),))
+
+    prop1 = PropertyValue()
+    prop1.Name  = "FilterName"
+    prop1.Value = "HTML (StarWriter)"
+    prop2 = PropertyValue()
+    prop2.Name = "InputStream" 
+    prop2.Value = oStream
+    
+    doc.Text.createTextCursor().insertDocumentFromURL("private:stream", (prop1, prop2))
+
 
 def OpenICalendar():
     """Prints the string 'Hello World(in Python)' into the current document"""
