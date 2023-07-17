@@ -8,9 +8,15 @@ import urllib.request
 from datetime import datetime
 from datetime import date
 
-
 import tempfile
 import markdown
+import configparser
+
+config = configparser.ConfigParser()
+config.sections()
+#TODO: Get settings path from OS
+config.read('ics2dtp.ini')
+print(config.sections())
 
 # try:
 #     import uno
@@ -89,6 +95,7 @@ def OpenICalendar():
         #filePicker = serviceManager.createInstance('com.sun.star.ui.dialogs.FilePicker')
         #filePicker.appendFilter("iCalendar Files (*.ics)", "*.ics")
         #url = "https://..."
+        url = config['source']['url']
         #status.setText('XXX: %s' % url)
         scribus.statusMessage('XXX: %s' % url)
         if url is not None:
