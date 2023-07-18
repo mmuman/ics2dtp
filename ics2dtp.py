@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import re
 import sys
 import time
@@ -13,6 +14,8 @@ from datetime import date
 import tempfile
 import markdown
 import configparser
+
+print(sys.argv)
 
 config = configparser.ConfigParser()
 config.sections()
@@ -42,6 +45,17 @@ print(config.sections())
 def _(m):
     return m
 
+try:
+    import uno
+    from com.sun.star.text.ControlCharacter import LINE_BREAK
+    from com.sun.star.text.ControlCharacter import PARAGRAPH_BREAK
+    from com.sun.star.beans import PropertyValue
+    from com.sun.star.lang import XMain
+    from com.sun.star.script.provider import XScript
+    #import screen_io as ui
+except (ImportError,NameError) as err:
+    #print("No LO API")
+    pass
 
 # base class for DTP scripting APIs
 class DTPInterface:
@@ -64,6 +78,103 @@ class LibreOfficeInterface(DTPInterface):
         print("status = %s" % str(self.status))
         self.lastStatus = ""
     pass
+
+    # unused
+    def _getScript(self, script: str, library='_Basic', module='devTools') -> XScript:
+        from com.sun.star.script.provider import XScript
+        sm = uno.getComponentContext().ServiceManager
+        mspf = sm.createInstanceWithContext("com.sun.star.script.provider.MasterScriptProviderFactory", uno.getComponentContext())
+        scriptPro = mspf.createScriptProvider("")
+        scriptName = "vnd.sun.star.script:"+library+"."+module+"."+script+"?language=Basic&location=application"
+        xScript = scriptPro.getScript(scriptName)
+        return xScript
+
+    # taken from https://wiki.openoffice.org/wiki/Python/Transfer_from_Basic_to_Python
+    # I'd think there was a ready-made version but no.
+    def _inputbox(self, message, title="", default="", x=None, y=None):
+        """ Shows dialog with input box.
+            @param message message to show on the dialog
+            @param title window title
+            @param default default value
+            @param x dialog positio in twips, pass y also
+            @param y dialog position in twips, pass y also
+            @return string if OK button pushed, otherwise zero length string
+        """
+        from com.sun.star.awt.MessageBoxType import \
+            MESSAGEBOX, \
+            INFOBOX, \
+            WARNINGBOX, \
+            ERRORBOX, \
+            QUERYBOX
+        from com.sun.star.awt.MessageBoxButtons import \
+            BUTTONS_OK, \
+            BUTTONS_OK_CANCEL, \
+            BUTTONS_YES_NO, \
+            BUTTONS_YES_NO_CANCEL, \
+            BUTTONS_RETRY_CANCEL, \
+            BUTTONS_ABORT_IGNORE_RETRY, \
+            DEFAULT_BUTTON_OK, \
+            DEFAULT_BUTTON_CANCEL, \
+            DEFAULT_BUTTON_RETRY, \
+            DEFAULT_BUTTON_YES, \
+            DEFAULT_BUTTON_NO, \
+            DEFAULT_BUTTON_IGNORE
+        from com.sun.star.awt.MessageBoxResults import \
+            CANCEL, OK, YES, NO, RETRY, IGNORE
+
+        from com.sun.star.awt.PosSize import POS, SIZE, POSSIZE
+        from com.sun.star.awt.PushButtonType import OK, CANCEL
+        from com.sun.star.util.MeasureUnit import TWIP
+        WIDTH = 600
+        HORI_MARGIN = VERT_MARGIN = 8
+        BUTTON_WIDTH = 100
+        BUTTON_HEIGHT = 26
+        HORI_SEP = VERT_SEP = 8
+        LABEL_HEIGHT = BUTTON_HEIGHT * 2 + 5
+        EDIT_HEIGHT = 24
+        HEIGHT = VERT_MARGIN * 2 + LABEL_HEIGHT + VERT_SEP + EDIT_HEIGHT
+        ctx = uno.getComponentContext()
+        def create(name):
+            return ctx.getServiceManager().createInstanceWithContext(name, ctx)
+        dialog = create("com.sun.star.awt.UnoControlDialog")
+        dialog_model = create("com.sun.star.awt.UnoControlDialogModel")
+        dialog.setModel(dialog_model)
+        dialog.setVisible(False)
+        dialog.setTitle(title)
+        dialog.setPosSize(0, 0, WIDTH, HEIGHT, SIZE)
+        def add(name, type, x_, y_, width_, height_, props):
+            model = dialog_model.createInstance("com.sun.star.awt.UnoControl" + type + "Model")
+            dialog_model.insertByName(name, model)
+            control = dialog.getControl(name)
+            control.setPosSize(x_, y_, width_, height_, POSSIZE)
+            for key, value in props.items():
+                setattr(model, key, value)
+        label_width = WIDTH - BUTTON_WIDTH - HORI_SEP - HORI_MARGIN * 2
+        add("label", "FixedText", HORI_MARGIN, VERT_MARGIN, label_width, LABEL_HEIGHT, 
+            {"Label": str(message), "NoLabel": True})
+        add("btn_ok", "Button", HORI_MARGIN + label_width + HORI_SEP, VERT_MARGIN, 
+                BUTTON_WIDTH, BUTTON_HEIGHT, {"PushButtonType": OK, "DefaultButton": True})
+        add("btn_cancel", "Button", HORI_MARGIN + label_width + HORI_SEP, VERT_MARGIN + BUTTON_HEIGHT + 5, 
+                BUTTON_WIDTH, BUTTON_HEIGHT, {"PushButtonType": CANCEL})
+        add("edit", "Edit", HORI_MARGIN, LABEL_HEIGHT + VERT_MARGIN + VERT_SEP, 
+                WIDTH - HORI_MARGIN * 2, EDIT_HEIGHT, {"Text": str(default)})
+        frame = create("com.sun.star.frame.Desktop").getCurrentFrame()
+        window = frame.getContainerWindow() if frame else None
+        dialog.createPeer(create("com.sun.star.awt.Toolkit"), window)
+        if not x is None and not y is None:
+            ps = dialog.convertSizeToPixel(uno.createUnoStruct("com.sun.star.awt.Size", x, y), TWIP)
+            _x, _y = ps.Width, ps.Height
+        elif window:
+            ps = window.getPosSize()
+            _x = ps.Width / 2 - WIDTH / 2
+            _y = ps.Height / 2 - HEIGHT / 2
+        dialog.setPosSize(_x, _y, 0, 0, POS)
+        edit = dialog.getControl("edit")
+        edit.setSelection(uno.createUnoStruct("com.sun.star.awt.Selection", 0, len(str(default))))
+        edit.setFocus()
+        ret = edit.getModel().Text if dialog.execute() else ""
+        dialog.dispose()
+        return ret
 
     # TODO
     def InsertText(self, t):
@@ -106,6 +217,18 @@ class LibreOfficeInterface(DTPInterface):
     def leaveUndoContext(self):
         self.undos.leaveUndoContext()
 
+    def valueDialog(self, caption: str, message='LibreOffice', defaultvalue = '') -> str:
+        #import screen_io as ui
+        #import msgbox as ui
+        #reply = ui.InputBox(message, title=caption, defaultValue=defaultValue)
+        reply = self._inputbox(message,caption,defaultvalue)
+        #xScript = self._getScript("_InputBox")
+        #res = xScript.invoke((prompt,title,defaultValue), (), ())
+        #return res[0]
+        return reply
+
+
+
 # Scribus scripting references:
 # https://wiki.scribus.net/canvas/Category:Scripts
 # https://wiki.scribus.net/canvas/Beginners_Scripts
@@ -147,6 +270,9 @@ class ScribusInterface(DTPInterface):
         #TODO: unsupported yet in Scribus
         pass
 
+    def valueDialog(self, caption: str, message='Scribus', defaultvalue = '') -> str:
+            return scribus.valueDialog(caption, message, defaultvalue)
+
 dtp = None
 
 try:
@@ -158,11 +284,13 @@ except ImportError as err:
     print (_('Cannot access the Scribus scripting interface.'))
     #sys.exit(1)
     try:
-        import uno
-        from com.sun.star.text.ControlCharacter import LINE_BREAK
-        from com.sun.star.text.ControlCharacter import PARAGRAPH_BREAK
-        from com.sun.star.beans import PropertyValue
-        from com.sun.star.lang import XMain
+        #import uno
+        #from com.sun.star.text.ControlCharacter import LINE_BREAK
+        #from com.sun.star.text.ControlCharacter import PARAGRAPH_BREAK
+        #from com.sun.star.beans import PropertyValue
+        #from com.sun.star.lang import XMain
+        #from com.sun.star.script.provider import XScript
+        #import screen_io as ui
         # We can actually import all these even from outside LibreOffice,
         # so try to access the scripting entry point
         print("pre XSC")
@@ -339,8 +467,11 @@ def InsertICalendar( ):
     # class FontWeight():
     #     from com.sun.star.awt.FontWeight import (NORMAL, BOLD,)
 
-    #frame = agenda_text_block
-    frame = "Description_test" # XXX:test
+    frame = agenda_text_block
+    #frame = "Description_test" # XXX:test
+
+    ret = dtp.valueDialog("Date range", "which date range?", "2023-09-01:2023-09-29")
+    print("DR: %s" % ret)
 
     events = OpenICalendar()
     
