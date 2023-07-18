@@ -16,8 +16,19 @@ import configparser
 
 config = configparser.ConfigParser()
 config.sections()
-#TODO: Get settings path from OS
-config.read('ics2dtp.ini')
+
+#TODO: Get settings path from Windows
+# Maybe use https://pypi.org/project/config-path/ ? not packaged on Debian.
+for loc in os.curdir, os.environ.get("XDG_CONFIG_HOME"), os.path.join(os.path.expanduser("~"), ".config"):
+    if loc is None:
+        continue
+    try:
+        with open(os.path.join(loc,"ics2dtp.ini")) as source:
+            print("Found ini file in %s" % loc)
+            config.read_file( source )
+            break
+    except IOError:
+        pass
 print(config.sections())
 
 # XXX: modules/scripts should not do this:
