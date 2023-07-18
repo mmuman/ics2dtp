@@ -31,21 +31,11 @@ print(config.sections())
 def _(m):
     return m
 
-# try:
-#     import uno
-#     from com.sun.star.text.ControlCharacter import LINE_BREAK
-#     from com.sun.star.text.ControlCharacter import PARAGRAPH_BREAK
-#     from com.sun.star.lang import XMain
-# except ImportError as err:
-#     print (_('Cannot import the LibreOffice scripting interface.'))
-#     # TODO
 
-try:
-    import scribus
-except ImportError as err:
-    print (_('This Python script is written for the Scribus scripting interface.'))
-    print (_('It can only be run from within Scribus.'))
-    sys.exit(1)
+# base class for DTP scripting APIs
+class DTPInterface:
+    #def __init__:
+    pass
 
 # LibreOffice scripting references:
 # https://wiki.openoffice.org/wiki/Python_as_a_macro_language
@@ -54,11 +44,51 @@ except ImportError as err:
 # http://hydrogeotools.blogspot.fr/2014/03/libreoffice-and-python-macros.html
 # http://openoffice3.web.fc2.com/Python_Macro_General_No6.html
 
+class LibreOfficeInterface(DTPInterface):
+    pass
+    # TODO
+
 # Scribus scripting references:
 # https://wiki.scribus.net/canvas/Category:Scripts
 # https://wiki.scribus.net/canvas/Beginners_Scripts
 # https://wiki.scribus.net/canvas/Automatic_Scripter_Commands_list
 # https://scribus-scripter.readthedocs.io/en/latest/
+
+class ScribusInterface(DTPInterface):
+    pass
+    # TODO
+
+
+dtp = None
+
+try:
+    import scribus
+    dtp = ScribusInterface()
+except ImportError as err:
+    #print (_('This Python script is written for the Scribus scripting interface.'))
+    #print (_('It can only be run from within Scribus.'))
+    print (_('Cannot access the Scribus scripting interface.'))
+    #sys.exit(1)
+    try:
+        import uno
+        from com.sun.star.text.ControlCharacter import LINE_BREAK
+        from com.sun.star.text.ControlCharacter import PARAGRAPH_BREAK
+        from com.sun.star.lang import XMain
+        # We can actually import all these even from outside LibreOffice,
+        # so try to access the scripting entry point
+        XSCRIPTCONTEXT.getDocument()
+        dtp = LibreOfficeInterface()
+    except (ImportError,NameError) as err:
+        pass
+        print (_('Cannot access the LibreOffice scripting interface.'))
+
+
+if dtp is None:
+    print (_('This Python script is written for the LibreOffice or Scribus scripting interface.'))
+    print (_('It can only be run from within either of these programs.'))
+    sys.exit(1)
+
+
 
 agenda_text_block = "Agenda"
 desc_text_block = "Description"
