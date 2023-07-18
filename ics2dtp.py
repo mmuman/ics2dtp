@@ -87,6 +87,8 @@ class LibreOfficeInterface(DTPInterface):
         self.status.start(self.lastStatus, t-1) # XXX
     def progressSet(self, p):
         self.status.setValue(p)
+    def progressEnd(self):
+        self.status.end()
 
     def enterUndoContext(self, name):
         self.undos.enterUndoContext(name)
@@ -124,6 +126,8 @@ class ScribusInterface(DTPInterface):
         scribus.progressTotal(t)
     def progressSet(self, p):
         scribus.progressSet(int(p))
+    def progressEnd(self):
+        scribus.progressReset()
 
     def enterUndoContext(self, name):
         #TODO: unsupported yet in Scribus
@@ -299,7 +303,7 @@ def OpenICalendar():
             #     statusDone += 50/len(events)
             #     status.setValue(statusDone)
             # dtp.leaveUndoContext()
-            dtp.progressReset()
+            dtp.progressEnd()
         else:
             print("cancelled!")
     except:
@@ -308,7 +312,7 @@ def OpenICalendar():
         #status.setValue(-1)
         #status.end()
         dtp.statusMessage(_('Aborted'))
-        dtp.progressReset()
+        dtp.progressEnd()
         raise
     #text.insertString( cursor, "Fine %s\n" % sys.version, 0 )
     #print("Fine %s\n" % sys.version)
@@ -395,7 +399,7 @@ def InsertICalendar( ):
     print(html)
     dtp.insertHtmlText(html, frame)
     dtp.leaveUndoContext()
-    dtp.progressReset()
+    dtp.progressEnd()
 
 # TODO: FIXME
 def InsertICalendarTimeTable( ):
