@@ -8,6 +8,8 @@ import urllib.request
 from datetime import datetime
 from datetime import date
 
+#import locale
+#import gettext
 import tempfile
 import markdown
 import configparser
@@ -18,20 +20,31 @@ config.sections()
 config.read('ics2dtp.ini')
 print(config.sections())
 
+# XXX: modules/scripts should not do this:
+#use current locale setting
+#locale.setlocale(locale.LC_ALL, None)
+#TODO: test for Win stuff
+#print(locale.getlocale(locale.LC_MESSAGES))
+
+# TODO: use gettext? maybe a local DictTranslations class to avoid installing mo files
+# For now we'll just wrap around English messages.
+def _(m):
+    return m
+
 # try:
 #     import uno
 #     from com.sun.star.text.ControlCharacter import LINE_BREAK
 #     from com.sun.star.text.ControlCharacter import PARAGRAPH_BREAK
 #     from com.sun.star.lang import XMain
 # except ImportError as err:
-#     print ('Cannot import the LibreOffice scripting interface.')
+#     print (_('Cannot import the LibreOffice scripting interface.'))
 #     # TODO
 
 try:
     import scribus
 except ImportError as err:
-    print ('This Python script is written for the Scribus scripting interface.')
-    print ('It can only be run from within Scribus.')
+    print (_('This Python script is written for the Scribus scripting interface.'))
+    print (_('It can only be run from within Scribus.'))
     sys.exit(1)
 
 # LibreOffice scripting references:
@@ -97,7 +110,7 @@ def OpenICalendar():
         #url = "https://..."
         url = config['source']['url']
         #status.setText('XXX: %s' % url)
-        scribus.statusMessage('XXX: %s' % url)
+        scribus.statusMessage('Requesting URL: %s' % url)
         if url is not None:
             oAccept = 1
         else:
@@ -110,7 +123,7 @@ def OpenICalendar():
             #statusMax = 100 * len(oFiles)
             #status.start('Opening', statusMax)
             #status.setValue(0)
-            scribus.statusMessage('Opening...')
+            scribus.statusMessage(_('Opening...'))
             scribus.progressTotal(100)
             scribus.progressSet(0)
             for url in oFiles:
@@ -213,10 +226,10 @@ def OpenICalendar():
         #status.setText('XXX: %s' % (str(sys.exc_info())))
         scribus.statusMessage('XXX: %s' % (str(sys.exc_info())))
         print("Except:%s\n" % (str(sys.exc_info())))
-        #status.setText('Aborted')
+        #status.setText(_('Aborted'))
         #status.setValue(-1)
         #status.end()
-        scribus.statusMessage('Aborted')
+        scribus.statusMessage(_('Aborted'))
         scribus.progressReset()
         raise
     #text.insertString( cursor, "Fine %s\n" % sys.version, 0 )
@@ -249,7 +262,7 @@ def InsertICalendar( ):
     scribus.progressReset()
     scribus.progressTotal(100)
     scribus.progressSet(0)
-    scribus.statusMessage('Inserting')
+    scribus.statusMessage(_('Inserting'))
     # this puts the text at start of document
     #text = model.Text
     #cursor = text.createTextCursor()
@@ -330,7 +343,7 @@ def InsertICalendarTimeTable( ):
     statusDone = 0
     statusMax = 100
     status.reset()
-    status.start('Inserting', statusMax)
+    status.start(_('Inserting'), statusMax)
     status.setValue(0)
     # this puts the text at start of document
     #text = model.Text
@@ -344,7 +357,7 @@ def InsertICalendarTimeTable( ):
     
     # sort events in place
     events.sort(key=lambda e: e.start)
-    undos.enterUndoContext( 'Insert iCalendar' );
+    undos.enterUndoContext( _('Insert iCalendar') );
     last_date = date.fromordinal(1)
     cursor.CharWeight = FontWeight.NORMAL
     cursor.CharPosture = FontSlant.NONE
@@ -420,7 +433,7 @@ def main_wrapper(argv):
     the main() function. Once everything finishes it cleans up after the main()
     function, making sure everything is sane before the script terminates."""
     try:
-        scribus.statusMessage('Running script...')
+        scribus.statusMessage(_('Running script...'))
         scribus.progressReset()
         main(argv)
     finally:
