@@ -495,7 +495,11 @@ def InsertICalendarTimeTable( ):
     undos.leaveUndoContext()
     status.end()
 
-#g_exportedScripts = InsertICalendar, InsertICalendarTimeTable,
+# LibreOffice: export only these to the UI
+
+g_exportedScripts = InsertICalendar, InsertICalendarTimeTable,
+
+# Scribus: handle script launch
 
 def main(argv):
     """Application initialization, font checks and initial setup."""
