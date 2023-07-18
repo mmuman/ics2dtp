@@ -45,8 +45,53 @@ class DTPInterface:
 # http://openoffice3.web.fc2.com/Python_Macro_General_No6.html
 
 class LibreOfficeInterface(DTPInterface):
+    def __init__(self):
+        self.model = XSCRIPTCONTEXT.getDocument()
+        self.controller = self.model.getCurrentController()
+        self.undos = self.model.getUndoManager()
+        self.status = self.controller.getFrame().createStatusIndicator()
+        print("status = %s" % str(self.status))
+        self.lastStatus = ""
     pass
+
     # TODO
+    def InsertText(self, t):
+        pass
+
+    def insertHtmlText(self, html, frame):
+        from com.sun.star.beans import PropertyValue
+        # https://ask.libreoffice.org/t/paste-html-content-using-api/89749/4
+        #def InsertHtml2Odt_3(sHTML, doc):
+        local = uno.getComponentContext()
+        ctx = local # not sure we need to resolve external context
+        oStream = ctx.ServiceManager.createInstanceWithContext("com.sun.star.io.SequenceInputStream", ctx)
+        oStream.initialize((uno.ByteSequence(html.encode()),))
+
+        prop1 = PropertyValue()
+        prop1.Name  = "FilterName"
+        prop1.Value = "HTML (StarWriter)"
+        prop2 = PropertyValue()
+        prop2.Name = "InputStream"
+        prop2.Value = oStream
+
+        self.model.Text.createTextCursor().insertDocumentFromURL("private:stream", (prop1, prop2))
+
+
+    def statusMessage(self, s):
+        self.lastStatus = s
+        self.status.setText(s)
+
+    def progressReset(self):
+        self.status.reset()
+    def progressTotal(self, t):
+        self.status.start(self.lastStatus, t-1) # XXX
+    def progressSet(self, p):
+        self.status.setValue(p)
+
+    def enterUndoContext(self, name):
+        self.undos.enterUndoContext(name)
+    def leaveUndoContext(self):
+        self.undos.leaveUndoContext()
 
 # Scribus scripting references:
 # https://wiki.scribus.net/canvas/Category:Scripts
@@ -55,9 +100,37 @@ class LibreOfficeInterface(DTPInterface):
 # https://scribus-scripter.readthedocs.io/en/latest/
 
 class ScribusInterface(DTPInterface):
-    pass
-    # TODO
+    def __init__(self):
+        self.scribus = scribus
 
+    # TODO
+    def InsertText(self, t):
+        pass
+
+    def insertHtmlText(self, html, frame):
+        # TODO: check Win reopen
+        # https://docs.python.org/3/library/tempfile.html#tempfile.NamedTemporaryFile
+        with tempfile.NamedTemporaryFile(suffix=".html") as f:
+            f.write(html.encode())
+            f.flush()
+            self.scribus.insertHtmlText(f.name, frame)
+
+    def statusMessage(self, s):
+        scribus.statusMessage(s)
+
+    def progressReset(self):
+        scribus.progressReset()
+    def progressTotal(self, t):
+        scribus.progressTotal(t)
+    def progressSet(self, p):
+        scribus.progressSet(int(p))
+
+    def enterUndoContext(self, name):
+        #TODO: unsupported yet in Scribus
+        pass
+    def leaveUndoContext(self):
+        #TODO: unsupported yet in Scribus
+        pass
 
 dtp = None
 
@@ -73,13 +146,17 @@ except ImportError as err:
         import uno
         from com.sun.star.text.ControlCharacter import LINE_BREAK
         from com.sun.star.text.ControlCharacter import PARAGRAPH_BREAK
+        from com.sun.star.beans import PropertyValue
         from com.sun.star.lang import XMain
         # We can actually import all these even from outside LibreOffice,
         # so try to access the scripting entry point
+        print("pre XSC")
         XSCRIPTCONTEXT.getDocument()
+        print("XSC")
         dtp = LibreOfficeInterface()
     except (ImportError,NameError) as err:
-        pass
+        #pass
+        print (str(err))
         print (_('Cannot access the LibreOffice scripting interface.'))
 
 
@@ -94,21 +171,6 @@ agenda_text_block = "Agenda"
 desc_text_block = "Description"
 
 
-# https://ask.libreoffice.org/t/paste-html-content-using-api/89749/4
-def InsertHtml2Odt_3(sHTML, doc):
-    oStream = ctx.ServiceManager.createInstanceWithContext("com.sun.star.io.SequenceInputStream", ctx)
-    oStream.initialize((uno.ByteSequence(sHTML.encode()),))
-
-    prop1 = PropertyValue()
-    prop1.Name  = "FilterName"
-    prop1.Value = "HTML (StarWriter)"
-    prop2 = PropertyValue()
-    prop2.Name = "InputStream" 
-    prop2.Value = oStream
-    
-    doc.Text.createTextCursor().insertDocumentFromURL("private:stream", (prop1, prop2))
-
-
 def OpenICalendar():
     """Prints the string 'Hello World(in Python)' into the current document"""
     #get the doc from the scripting context which is made available to all scripts
@@ -118,18 +180,13 @@ def OpenICalendar():
         import pytz
         from pytz import timezone
     except:
-        #status.setText('Ex: %s' % (str(sys.exc_info())))
-        scribus.statusMessage('Ex: %s' % (str(sys.exc_info())))
+        dtp.statusMessage('Ex: %s' % (str(sys.exc_info())))
         print("Except:%s\n" % (str(sys.exc_info())))
         raise
 
-    #model = XSCRIPTCONTEXT.getDocument()
-    #controller = model.getCurrentController()
-    #status = controller.getFrame().createStatusIndicator()
     statusDone = 0
     statusMax = 100
-    #status.reset()
-    scribus.progressReset()
+    dtp.progressReset()
     events = []
     url = None
     try:
@@ -139,8 +196,7 @@ def OpenICalendar():
         #filePicker.appendFilter("iCalendar Files (*.ics)", "*.ics")
         #url = "https://..."
         url = config['source']['url']
-        #status.setText('XXX: %s' % url)
-        scribus.statusMessage('Requesting URL: %s' % url)
+        dtp.statusMessage('Requesting URL: %s' % url)
         if url is not None:
             oAccept = 1
         else:
@@ -150,24 +206,19 @@ def OpenICalendar():
                 oFiles = [url]
             else:
                 oFiles = filePicker.getFiles()
-            #statusMax = 100 * len(oFiles)
-            #status.start('Opening', statusMax)
-            #status.setValue(0)
-            scribus.statusMessage(_('Opening...'))
-            scribus.progressTotal(100)
-            scribus.progressSet(0)
+            statusMax = 100 * len(oFiles)
+            dtp.statusMessage(_('Opening...'))
+            dtp.progressTotal(statusMax+1)
+            dtp.progressSet(0)
             for url in oFiles:
-                #status.setText('Processing: ' + url )
-                #status.setValue(statusDone)
-                scribus.statusMessage('Processing: ' + url )
-                scribus.progressSet(statusDone)
+                dtp.statusMessage('Processing: ' + url )
+                dtp.progressSet(statusDone)
                 tz = None
                 print(url)
                 with urllib.request.urlopen(url) as f:
                     #print(f)
                     data = f.read()
-                    #status.setValue(statusDone+50/2*len(oFiles))
-                    scribus.progressSet(int(statusDone+50/2*len(oFiles)))
+                    dtp.progressSet(int(statusDone+50/2*len(oFiles)))
                     cal = icalendar.Calendar.from_ical(data)
                     for comp in cal.walk():
                         print(comp.name)
@@ -226,11 +277,11 @@ def OpenICalendar():
                     #print(cal.property_items())
                     statusDone += 100/len(oFiles)
                     #status.setValue(statusDone)
-                    scribus.progressSet(int(statusDone))
+                    dtp.progressSet(int(statusDone))
 
             # sort events in place
             # events.sort(key=lambda e: e.start)
-            # undos.enterUndoContext( 'Insert iCalendar' ); 
+            # dtp.enterUndoContext( 'Insert iCalendar' )
             # for comp in events:
             #     start = comp.start
             #     end = comp.end
@@ -247,20 +298,17 @@ def OpenICalendar():
             #         text.insertString( cursor, "%s\n" % comp['DESCRIPTION'], 0 )
             #     statusDone += 50/len(events)
             #     status.setValue(statusDone)
-            # undos.leaveUndoContext()
-            #status.end()
-            scribus.progressReset()
+            # dtp.leaveUndoContext()
+            dtp.progressReset()
         else:
             print("cancelled!")
     except:
-        #status.setText('XXX: %s' % (str(sys.exc_info())))
-        scribus.statusMessage('XXX: %s' % (str(sys.exc_info())))
+        dtp.statusMessage('XXX: %s' % (str(sys.exc_info())))
         print("Except:%s\n" % (str(sys.exc_info())))
-        #status.setText(_('Aborted'))
         #status.setValue(-1)
         #status.end()
-        scribus.statusMessage(_('Aborted'))
-        scribus.progressReset()
+        dtp.statusMessage(_('Aborted'))
+        dtp.progressReset()
         raise
     #text.insertString( cursor, "Fine %s\n" % sys.version, 0 )
     #print("Fine %s\n" % sys.version)
@@ -286,24 +334,20 @@ def InsertICalendar( ):
     #status = controller.getFrame().createStatusIndicator()
     statusDone = 0
     statusMax = 100
-    #status.reset()
-    #status.start('Inserting', statusMax)
-    #status.setValue(0)
-    scribus.progressReset()
-    scribus.progressTotal(100)
-    scribus.progressSet(0)
-    scribus.statusMessage(_('Inserting'))
+    dtp.progressReset()
+    dtp.progressTotal(statusMax+1)
+    dtp.progressSet(0)
+    dtp.statusMessage(_('Inserting'))
     # this puts the text at start of document
     #text = model.Text
     #cursor = text.createTextCursor()
     # this puts the text at current insertion point
     #text = controller.getViewCursor().getText()
     #cursor = text.createTextCursorByRange(controller.getViewCursor().getStart())
-    #undos = model.getUndoManager()
     
     # sort events in place
     events.sort(key=lambda e: e.start)
-    #undos.enterUndoContext( 'Insert iCalendar' ); 
+    dtp.enterUndoContext( _('Insert iCalendar') )
     md = ""
     for comp in events:
         start = comp.start
@@ -335,30 +379,25 @@ def InsertICalendar( ):
             md += "\n%s" % comp['DESCRIPTION']
             
         statusDone += 50/len(events)
-        #status.setValue(statusDone)
+        dtp.progressSet(int(statusDone))
         print(statusDone)
         md += "\n"
 
-    #scribus.progressSet(min(int(statusDone),99))
-    # TODO: check Win reopen
-    # https://docs.python.org/3/library/tempfile.html#tempfile.NamedTemporaryFile
-    with tempfile.NamedTemporaryFile(suffix=".html") as f:
-        print(md)
-        # TODO: h1,h2 -> span class= ?
-        #f.write(("<html><head><meta encoding='UTF-8'></head><body>%s</body></html>" % str(markdown.markdown(md))))
-        html = markdown.markdown(md)
-        #h2_style = "04 TITRES CATÉGORIES BLANC SUR COULEUR"
-        h2_style = "Edito"
-        html = re.sub('<h2>(.*)</h2>', '<p style="%s">\\1</p>' % h2_style, html)
-        html = '<?xml version="1.0" encoding="utf-8"?><html><head></head><body>%s</body></html>\n' % html
-        print(html)
-        f.write(html.encode())
-        f.flush()
-        scribus.insertHtmlText(f.name, frame)
-        #scribus.insertText(" %s\n" % markdown.markdown(md), -1, frame)
-    #undos.leaveUndoContext()
-    #status.end()
+    #dtp.progressSet(min(int(statusDone),99))
+    print(md)
+    # TODO: h1,h2 -> span class= ?
+    #f.write(("<html><head><meta encoding='UTF-8'></head><body>%s</body></html>" % str(markdown.markdown(md))))
+    html = markdown.markdown(md)
+    #h2_style = "04 TITRES CATÉGORIES BLANC SUR COULEUR"
+    h2_style = "Edito"
+    html = re.sub('<h2>(.*)</h2>', '<p style="%s">\\1</p>' % h2_style, html)
+    html = '<?xml version="1.0" encoding="utf-8"?><html><head></head><body>%s</body></html>\n' % html
+    print(html)
+    dtp.insertHtmlText(html, frame)
+    dtp.leaveUndoContext()
+    dtp.progressReset()
 
+# TODO: FIXME
 def InsertICalendarTimeTable( ):
     class FontSlant():
         from com.sun.star.awt.FontSlant import (NONE, ITALIC,)
@@ -387,7 +426,7 @@ def InsertICalendarTimeTable( ):
     
     # sort events in place
     events.sort(key=lambda e: e.start)
-    undos.enterUndoContext( _('Insert iCalendar') );
+    undos.enterUndoContext( _('Insert iCalendar') )
     last_date = date.fromordinal(1)
     cursor.CharWeight = FontWeight.NORMAL
     cursor.CharPosture = FontSlant.NONE
@@ -463,8 +502,8 @@ def main_wrapper(argv):
     the main() function. Once everything finishes it cleans up after the main()
     function, making sure everything is sane before the script terminates."""
     try:
-        scribus.statusMessage(_('Running script...'))
-        scribus.progressReset()
+        dtp.statusMessage(_('Running script...'))
+        dtp.progressReset()
         main(argv)
     finally:
         # Exit neatly even if the script terminated with an exception,
@@ -472,8 +511,8 @@ def main_wrapper(argv):
         # drawing is enabled.
         if scribus.haveDoc() > 0:
             scribus.setRedraw(True)
-        scribus.statusMessage('')
-        scribus.progressReset()
+        dtp.statusMessage('')
+        dtp.progressReset()
 
 # This code detects if the script is being run as a script, or imported as a module.
 # It only runs main() if being run as a script. This permits you to import your script
