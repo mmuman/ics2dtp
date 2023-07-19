@@ -545,7 +545,7 @@ def InsertICalendar( ):
         # TODO: check Windows: %- -> %# ?
         # https://strftime.org/
         dfmt = "%A %-d %B"
-        tfmt = "%-Hh%-M"
+        tfmt = "%-Hh%M"
         print("XXX:{event.start:%A %-d %B} {event.start:%-Hh%M %-X}//{event.end.minute:d}\u2192{event.end:%-Hh%-0M}".format(event=comp))
         #cursor.CharWeight = FontWeight.BOLD
         #text.insertString( cursor, "[%s - %s]" % (start, end), 0 )
@@ -577,6 +577,8 @@ def InsertICalendar( ):
 
     #dtp.progressSet(min(int(statusDone),99))
     print(md)
+    # Apply post filter TODO: configure this in .ini
+    md = md.replace("h00","h")
     # TODO: h1,h2 -> span class= ?
     #f.write(("<html><head><meta encoding='UTF-8'></head><body>%s</body></html>" % str(markdown.markdown(md))))
     html = markdown.markdown(md)
