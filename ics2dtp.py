@@ -17,8 +17,12 @@ import configparser
 
 print(sys.argv)
 
-config = configparser.ConfigParser()
-config.sections()
+# sft0c allows referencing the strftime OS-specific modifier to remove leading 0
+config_defaults = {'sft0c': '-' if os.sep == '/' else '#'}
+config = configparser.ConfigParser(
+    defaults = config_defaults,
+    interpolation = configparser.ExtendedInterpolation()
+    )
 
 #TODO: Get settings path from Windows
 # Maybe use https://pypi.org/project/config-path/ ? not packaged on Debian.
