@@ -272,6 +272,7 @@ class ScribusInterface(DTPInterface):
         pass
     def leaveUndoContext(self):
         #TODO: unsupported yet in Scribus
+        scribus.docChanged(True)
         pass
 
     def valueDialog(self, caption: str, message='Scribus', defaultvalue = '') -> str:
