@@ -104,7 +104,7 @@ class LibreOfficeInterface(DTPInterface):
         self.controller = self.model.getCurrentController()
         self.undos = self.model.getUndoManager()
         self.status = self.controller.getFrame().createStatusIndicator()
-        print("status = %s" % str(self.status))
+        #print("status = %s" % str(self.status))
         self.lastStatus = ""
     pass
 
@@ -271,6 +271,7 @@ class LibreOfficeInterface(DTPInterface):
 class ScribusInterface(DTPInterface):
     def __init__(self):
         self.scribus = scribus
+        print(f'{scribus.getGuiLanguage()=}')
 
     # TODO
     def InsertText(self, t):
@@ -313,9 +314,9 @@ try:
     import scribus
     dtp = ScribusInterface()
 except ImportError as err:
-    #print (_('This Python script is written for the Scribus scripting interface.'))
-    #print (_('It can only be run from within Scribus.'))
-    print (_('Cannot access the Scribus scripting interface.'))
+    #print(_('This Python script is written for the Scribus scripting interface.'))
+    #print(_('It can only be run from within Scribus.'))
+    print(_('Cannot access the Scribus scripting interface.'))
     #sys.exit(1)
     try:
         #import uno
@@ -327,23 +328,32 @@ except ImportError as err:
         #import screen_io as ui
         # We can actually import all these even from outside LibreOffice,
         # so try to access the scripting entry point
-        print("pre XSC")
         XSCRIPTCONTEXT.getDocument()
-        print("XSC")
         dtp = LibreOfficeInterface()
     except (ImportError,NameError) as err:
         #pass
-        print (str(err))
-        print (_('Cannot access the LibreOffice scripting interface.'))
+        print(str(err))
+        print(_('Cannot access the LibreOffice scripting interface.'))
 
 
 if dtp is None:
-    print (_('This Python script is written for the LibreOffice or Scribus scripting interface.'))
-    print (_('It can only be run from within either of these programs.'))
+    print(_('This Python script is written for the LibreOffice or Scribus scripting interface.'))
+    print(_('It can only be run from within either of these programs.'))
     sys.exit(1)
 
+try:
+    # icalendar module is not always installed
+    import icalendar
+    import recurring_ical_events
+    import pytz
+    from pytz import timezone
+except ImportError as err:
+    dtp.statusMessage(': %s' % (str(err)))
+    print("Except:%s\n" % (str(sys.exc_info())))
+    raise
 
 
+# TODO: move to ini file
 agenda_text_block = "Agenda"
 desc_text_block = "Description"
 
@@ -351,15 +361,6 @@ desc_text_block = "Description"
 def OpenICalendar():
     """Prints the string 'Hello World(in Python)' into the current document"""
     #get the doc from the scripting context which is made available to all scripts
-    try:
-        # icalendar module is not always installed
-        import icalendar
-        import pytz
-        from pytz import timezone
-    except:
-        dtp.statusMessage('Ex: %s' % (str(sys.exc_info())))
-        print("Except:%s\n" % (str(sys.exc_info())))
-        raise
 
     statusDone = 0
     statusMax = 100
@@ -391,18 +392,21 @@ def OpenICalendar():
                 dtp.statusMessage('Processing: ' + url )
                 dtp.progressSet(statusDone)
                 tz = None
-                print(url)
+                print(f'{url=}')
                 with urllib.request.urlopen(url) as f:
                     #print(f)
                     data = f.read()
                     dtp.progressSet(int(statusDone+50/2*len(oFiles)))
                     cal = icalendar.Calendar.from_ical(data)
+                    import json
+                    #print(f'{str(cal.walk())=}')
+                    #recurring_ical_events.of(calendar).
                     for comp in cal.walk():
-                        print(comp.name)
+                        print(f'{comp.name=}')
                         if comp.name == 'VTIMEZONE':
                             if 'TZID' in comp:
                                 tz = timezone(comp['TZID'])
-                            print(comp)
+                            print(f'{comp=}')
                         elif comp.name == 'VEVENT':
                             start = comp.decoded('DTSTART')
                             end = comp.decoded('DTEND')
@@ -410,7 +414,7 @@ def OpenICalendar():
                             if hasattr(start, 'tzinfo'):
                                 if start.tzinfo == pytz.UTC:
                                     start = start.astimezone(tz)
-                                print(type(start.tzinfo))
+                                print(f'{type(start.tzinfo)=}')
                             elif isinstance(start, datetime):
                                 start = tz.localize(start)
                                 print("START:%s" % type(start))
@@ -443,14 +447,14 @@ def OpenICalendar():
                             # if 'DESCRIPTION' in comp:
                             #     text.insertString( cursor, "%s\n" % comp['DESCRIPTION'], 0 )
                         else:
-                            print(comp.name)
+                            print("Skipping %s object" % comp.name)
                     #try:
                     #    for comp in cal.walk():
                     #        print comp.name
                     #except:
                     #    raise
                     #    print component
-                    print(cal.__class__)
+                    #print(cal.__class__)
                     #print(cal.property_items())
                     statusDone += 100/len(oFiles)
                     #status.setValue(statusDone)
@@ -504,8 +508,8 @@ def InsertICalendar( ):
     frame = agenda_text_block
     #frame = "Description_test" # XXX:test
 
-    ret = dtp.valueDialog("Date range", "which date range?", "2023-09-01:2023-09-29")
-    print("DR: %s" % ret)
+    #ret = dtp.valueDialog("Date range", "which date range?", "2023-09-01:2023-09-29")
+    #print("DR: %s" % ret)
 
     events = OpenICalendar()
     
@@ -536,6 +540,7 @@ def InsertICalendar( ):
         # https://strftime.org/
         dfmt = "%A %-d %B"
         tfmt = "%-Hh%-M"
+        print("XXX:{event.start:%A %-d %B} {event.start:%-Hh%M %-X}//{event.end.minute:d}\u2192{event.end:%-Hh%-0M}".format(event=comp))
         #cursor.CharWeight = FontWeight.BOLD
         #text.insertString( cursor, "[%s - %s]" % (start, end), 0 )
         #scribus.insertText("[%s - %s]" % (start, end), -1, frame)
@@ -552,7 +557,8 @@ def InsertICalendar( ):
             #cursor.CharPosture = FontSlant.NONE
         md += "**%s**" % start.strftime(dfmt)
         md += " %s" % start.strftime(tfmt)
-        md += "\u2192%s\n" % end.strftime(tfmt)
+        md += "\u2192%s  \n" % end.strftime(tfmt)
+        md += "Test\n"
         if 'DESCRIPTION' in comp:
             #text.insertString( cursor, "%s\n" % comp['DESCRIPTION'], 0 )
             #scribus.insertText("%s\n" % comp['DESCRIPTION'], -1, frame)
@@ -574,6 +580,9 @@ def InsertICalendar( ):
     html = '<?xml version="1.0" encoding="utf-8"?><html><head></head><body>%s</body></html>\n' % html
     print(html)
     dtp.insertHtmlText(html, frame)
+    #print(scribus.getPosition())
+    #scribus.insertText("Foo\nbar\n\ntoto", -1, frame)
+    #print(scribus.getPosition())
     dtp.leaveUndoContext()
     dtp.progressEnd()
 
