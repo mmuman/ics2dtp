@@ -398,10 +398,16 @@ def OpenICalendar():
                     data = f.read()
                     dtp.progressSet(int(statusDone+50/2*len(oFiles)))
                     cal = icalendar.Calendar.from_ical(data)
-                    import json
+                    #import json
                     #print(f'{str(cal.walk())=}')
-                    #recurring_ical_events.of(calendar).
-                    for comp in cal.walk():
+                    # FIXME: pass start,end as args
+                    print(str(cal))
+                    #cal = recurring_ical_events.of(cal).between("20230701", "20230930")
+                    cal = recurring_ical_events.of(cal).between((2023, 7, 1), (2023, 9, 30))
+                    print(str(cal))
+                    # we get a list, not an enumerator
+                    #cal = enumerate(cal)
+                    for comp in cal:#cal.walk():
                         print(f'{comp.name=}')
                         if comp.name == 'VTIMEZONE':
                             if 'TZID' in comp:
