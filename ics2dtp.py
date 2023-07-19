@@ -9,13 +9,15 @@ import urllib.request
 from datetime import datetime
 from datetime import date
 
-#import locale
+import calendar
+import locale
 #import gettext
 import tempfile
 import markdown
 import configparser
 
-print(sys.argv)
+# TODO: handle argv[0] to select action from ini file
+#print(sys.argv)
 
 # sft0c allows referencing the strftime OS-specific modifier to remove leading 0
 config_defaults = {'sft0c': '-' if os.sep == '/' else '#'}
@@ -36,18 +38,41 @@ for loc in os.curdir, os.environ.get("XDG_CONFIG_HOME"), os.path.join(os.path.ex
             break
     except IOError:
         pass
-print(config.sections())
+# DEBUG:
+#print(config.sections())
+#print(config['templates']['foo'])
+#print(list(config['categories'].keys()).remove("sft0c"))
+#print(list(config['categories'].keys()))
+#filter out defaults: list(filter(lambda x: x not in config_defaults.keys(), k))
+#print(config['categories']['DIY'])
+#print(config['JEUX']['preamble'])
+
+#print(getmodule())
 
 # XXX: modules/scripts should not do this:
 #use current locale setting
 #locale.setlocale(locale.LC_ALL, None)
 #TODO: test for Win stuff
-#print(locale.getlocale(locale.LC_MESSAGES))
+#print("LC:%s" % str(locale.getlocale(locale.LC_MESSAGES)))
 
 # TODO: use gettext? maybe a local DictTranslations class to avoid installing mo files
 # For now we'll just wrap around English messages.
 def _(m):
     return m
+
+#print(f'{calendar.month_name[2]=}')
+#print(f'{calendar.day_name[0]=}')
+
+def _monthName(i):
+    # TODO: check on Windows
+    return calendar.month_name[i]
+    #return locale.nl_langinfo(locale.MON_1+i)
+
+def _dayName(i):
+    # TODO: check on Windows
+    return calendar.day_name[i]
+    #return locale.nl_langinfo(locale.DAY_1+(0+1)%7)
+
 
 try:
     import uno
