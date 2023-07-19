@@ -239,6 +239,10 @@ class LibreOfficeInterface(DTPInterface):
 # https://wiki.scribus.net/canvas/Automatic_Scripter_Commands_list
 # https://scribus-scripter.readthedocs.io/en/latest/
 
+# frame jump seems to be 1a 1b 0a
+# the line breaks inside same paragraph is:
+# U+2028	e2 80 a8	LINE SEPARATOR
+
 class ScribusInterface(DTPInterface):
     def __init__(self):
         self.scribus = scribus
