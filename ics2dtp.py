@@ -19,46 +19,6 @@ import configparser
 # TODO: handle argv[0] to select action from ini file
 #print(sys.argv)
 
-# sft0c allows referencing the strftime OS-specific modifier to remove leading 0
-config_defaults = {'sft0c': '-' if os.sep == '/' else '#'}
-config = configparser.ConfigParser(
-    defaults = config_defaults,
-    interpolation = configparser.ExtendedInterpolation()
-    )
-
-#TODO: Get settings path from Windows
-# Maybe use https://pypi.org/project/config-path/ ? not packaged on Debian.
-for loc in os.curdir, os.environ.get("XDG_CONFIG_HOME"), os.path.join(os.path.expanduser("~"), ".config"):
-    if loc is None:
-        continue
-    try:
-        with open(os.path.join(loc,"ics2dtp.ini")) as source:
-            print("Found ini file in %s" % loc)
-            config.read_file( source )
-            break
-    except IOError:
-        pass
-# DEBUG:
-#print(config.sections())
-#print(config['templates']['foo'])
-#print(list(config['categories'].keys()).remove("sft0c"))
-#print(list(config['categories'].keys()))
-#filter out defaults: list(filter(lambda x: x not in config_defaults.keys(), k))
-#print(config['categories']['DIY'])
-#print(config['JEUX']['preamble'])
-
-#print(getmodule())
-
-# XXX: modules/scripts should not do this:
-#use current locale setting
-#locale.setlocale(locale.LC_ALL, None)
-#TODO: test for Win stuff
-#print("LC:%s" % str(locale.getlocale(locale.LC_MESSAGES)))
-
-# TODO: use gettext? maybe a local DictTranslations class to avoid installing mo files
-# For now we'll just wrap around English messages.
-def _(m):
-    return m
 
 #print(f'{calendar.month_name[2]=}')
 #print(f'{calendar.day_name[0]=}')
@@ -351,6 +311,47 @@ except ImportError as err:
     dtp.statusMessage(': %s' % (str(err)))
     print("Except:%s\n" % (str(sys.exc_info())))
     raise
+
+# sft0c allows referencing the strftime OS-specific modifier to remove leading 0
+config_defaults = {'sft0c': '-' if os.sep == '/' else '#'}
+config = configparser.ConfigParser(
+    defaults = config_defaults,
+    interpolation = configparser.ExtendedInterpolation()
+    )
+
+#TODO: Get settings path from Windows
+# Maybe use https://pypi.org/project/config-path/ ? not packaged on Debian.
+for loc in os.curdir, os.environ.get("XDG_CONFIG_HOME"), os.path.join(os.path.expanduser("~"), ".config"):
+    if loc is None:
+        continue
+    try:
+        with open(os.path.join(loc,"ics2dtp.ini")) as source:
+            print("Found ini file in %s" % loc)
+            config.read_file( source )
+            break
+    except IOError:
+        pass
+# DEBUG:
+#print(config.sections())
+#print(config['templates']['foo'])
+#print(list(config['categories'].keys()).remove("sft0c"))
+#print(list(config['categories'].keys()))
+#filter out defaults: list(filter(lambda x: x not in config_defaults.keys(), k))
+#print(config['categories']['DIY'])
+#print(config['JEUX']['preamble'])
+
+#print(getmodule())
+
+# XXX: modules/scripts should not do this:
+#use current locale setting
+#locale.setlocale(locale.LC_ALL, None)
+#TODO: test for Win stuff
+#print("LC:%s" % str(locale.getlocale(locale.LC_MESSAGES)))
+
+# TODO: use gettext? maybe a local DictTranslations class to avoid installing mo files
+# For now we'll just wrap around English messages.
+def _(m):
+    return m
 
 
 # TODO: move to ini file
