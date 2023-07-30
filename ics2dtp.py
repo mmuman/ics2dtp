@@ -26,11 +26,13 @@ import configparser
 
 def _monthName(i):
     # TODO: check on Windows
+    # XXX: depends on default locale, not ini!
     return calendar.month_name[i]
     #return locale.nl_langinfo(locale.MON_1+i)
 
 def _dayName(i):
     # TODO: check on Windows
+    # XXX: depends on default locale, not ini!
     return calendar.day_name[i]
     #return locale.nl_langinfo(locale.DAY_1+(0+1)%7)
 
@@ -331,7 +333,10 @@ for loc in os.curdir, os.environ.get("XDG_CONFIG_HOME"), os.path.join(os.path.ex
             config.read_file( source )
             break
     except IOError:
+        # TODO
         pass
+# TODO: warn if no config file / propose a default one?
+
 # DEBUG:
 #print(config.sections())
 #print(config['templates']['foo'])
@@ -578,11 +583,11 @@ def InsertICalendar( ):
             #text.insertString( cursor, "%s\n" % comp['DESCRIPTION'], 0 )
             #scribus.insertText("%s\n" % comp['DESCRIPTION'], -1, frame)
             md += "\n%s" % comp['DESCRIPTION']
-            
         statusDone += 50/len(events)
         dtp.progressSet(int(statusDone))
         print(statusDone)
         md += "\n"
+        # TODO: alert( events without category)
 
     #dtp.progressSet(min(int(statusDone),99))
     print(md)
@@ -689,6 +694,10 @@ def InsertICalendarTimeTable( ):
 # LibreOffice: export only these to the UI
 
 g_exportedScripts = InsertICalendar, InsertICalendarTimeTable,
+
+# TODO: check if we can get the name of the calling function
+# maybe sys.exc_info()[2] ?
+# cf. help("TRACEBACKS")
 
 # Scribus: handle script launch
 
