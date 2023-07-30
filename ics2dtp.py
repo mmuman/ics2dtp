@@ -6,6 +6,7 @@ import sys
 import time
 #import traceback
 import urllib.request
+from urllib.error import URLError
 from datetime import datetime
 from datetime import date
 
@@ -393,11 +394,18 @@ def OpenICalendar():
                 dtp.statusMessage('Processing: ' + url )
                 dtp.progressSet(statusDone)
                 tz = None
+                data = None
                 print(f'{url=}')
-                with urllib.request.urlopen(url) as f:
-                    #print(f)
-                    data = f.read()
-                    dtp.progressSet(int(statusDone+50/2*len(oFiles)))
+                try:
+                    with urllib.request.urlopen(url) as f:
+                        #print(f)
+                        data = f.read()
+                        dtp.progressSet(int(statusDone+50/2*len(oFiles)))
+                except URLError as e:
+                    dtp.statusMessage(_('Error fetching: ') + url)
+                    # TODO: Alert dtp.
+                    continue
+                if data is not None:
                     cal = icalendar.Calendar.from_ical(data)
                     #import json
                     #print(f'{str(cal.walk())=}')
