@@ -459,29 +459,44 @@ def OpenICalendar():
                         elif comp.name == 'VEVENT':
                             start = comp.decoded('DTSTART')
                             end = comp.decoded('DTEND')
+                            print(comp['SUMMARY'])
                             print("Start: %s %s" % (start, type(start)))
-                            if hasattr(start, 'tzinfo'):
-                                if start.tzinfo == pytz.UTC:
-                                    start = start.astimezone(tz)
-                                print(f'{type(start.tzinfo)=}')
-                            elif isinstance(start, datetime):
-                                start = tz.localize(start)
-                                print("START:%s" % type(start))
-                            else:
-                                start = tz.localize(datetime.combine(start, datetime.min.time()))
+                            if isinstance(start, date):
+                                start = datetime.combine(start, datetime.min.time())
                             print("End: %s" % end)
-                            if hasattr(end, 'tzinfo'):
-                                print(end.tzinfo or None)
-                                if end.tzinfo == pytz.UTC:
-                                    end = end.astimezone(tz)
-                            elif isinstance(end, datetime):
-                                end = tz.localize(end)
-                            else:
-                                end = tz.localize(datetime.combine(end, datetime.min.time()))
-                            #if hasattr(comp, 'start') or hasattr(comp, 'end'):
-                            #    print("HHHHHHHHHHHHHH: %s" % comp)
+                            comp.start_datetime = start
                             comp.start = start
                             comp.end = end
+
+                            if 'categories_summary_match' not in config['source']:
+                                # TODO
+                                print("TODO: get categories from categories field")
+
+                            if 'SUMMARY' in comp:
+                                # TODO: check this!
+                                if 'categories_summary_match' in config['source']:
+                                    #print(config['source']['categories_summary_match'])
+                                    m = re.search(config['source']['categories_summary_match'], comp['SUMMARY'])
+                                    if m and len(m.group("title")):
+                                        print(m.groups())
+                                        # XXX: abuse this field or some other?
+                                        comp['CATEGORY'] = m.group("category")
+                                        comp['SUMMARY'] = m.group("title")
+                                    else:
+                                        print(comp)
+                                        dtp.messageBox(_("Event '{0}' without category, skipping.").format(comp['SUMMARY']))
+                                        continue
+
+                                if comp['CATEGORY'] not in config['categories']:
+                                    print(comp)
+                                    dtp.messageBox(_("Event '{0}' in unknown category '{1}'").format(comp['SUMMARY'], comp['CATEGORY']))
+                                    #break
+                                    continue
+
+                                if comp['CATEGORY'] in config and config[comp['CATEGORY']].getboolean('skip'):
+                                    dtp.statusMessage(_('Skipping event: {0}').format(comp['SUMMARY']))
+                                    continue
+
                             events.append(comp)
 
                             # cursor.CharWeight = FontWeight.BOLD
@@ -617,8 +632,6 @@ def InsertICalendar( ):
         dtp.progressSet(int(statusDone))
         print(statusDone)
         md += "\n"
-        # TODO: alert( events without category)
-        #dtp.messageBox()
 
     #dtp.progressSet(min(int(statusDone),99))
     print(md)
