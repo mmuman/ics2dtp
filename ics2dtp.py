@@ -396,6 +396,7 @@ def OpenICalendar():
     events = []
     url = None
     try:
+        # TODO: drop FilePicker stuff?
         #ctx = uno.getComponentContext()
         #serviceManager = ctx.ServiceManager
         #filePicker = serviceManager.createInstance('com.sun.star.ui.dialogs.FilePicker')
@@ -604,11 +605,13 @@ def InsertICalendar( ):
             #text.insertString( cursor, "%s\n" % comp['DESCRIPTION'], 0 )
             #scribus.insertText("%s\n" % comp['DESCRIPTION'], -1, frame)
             md += "\n%s" % comp['DESCRIPTION']
+            # TODO: filtrer "(sur inscription.*" vers l'agenda!
         statusDone += 50/len(events)
         dtp.progressSet(int(statusDone))
         print(statusDone)
         md += "\n"
         # TODO: alert( events without category)
+        #dtp.messageBox()
 
     #dtp.progressSet(min(int(statusDone),99))
     print(md)
