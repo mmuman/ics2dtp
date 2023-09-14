@@ -40,6 +40,14 @@ def _dayName(i):
     #return locale.nl_langinfo(locale.DAY_1+(0+1)%7)
 
 
+# Work around https://bugs.python.org/issue27400
+def strptime(s, fmt):
+    try:
+        return datetime.strptime(s, fmt)
+    except TypeError:
+        import time
+        return datetime.fromtimestamp(time.mktime(time.strptime(s, fmt)))
+
 try:
     import uno
     from com.sun.star.text.ControlCharacter import LINE_BREAK
@@ -434,16 +442,15 @@ def OpenICalendar():
                     continue
                 if data is not None:
                     cal = icalendar.Calendar.from_ical(data)
-                    #import json
-                    #print(f'{str(cal.walk())=}')
                     # FIXME: pass start,end as args
-                    print(str(cal))
-                    #cal = recurring_ical_events.of(cal).between("20230701", "20230930")
-                    cal = recurring_ical_events.of(cal).between((2023, 7, 1), (2023, 9, 30))
-                    print(str(cal))
+                    #print(str(cal))
+                    period = config['general']['period'].split(" ")
+                    period = [datetime.fromisoformat(p) for p in period]
+                    cal = recurring_ical_events.of(cal, keep_recurrence_attributes=True).between(period[0], period[1])
                     # we get a list, not an enumerator
                     #cal = enumerate(cal)
                     for comp in cal:#cal.walk():
+                    #for comp in cal.walk():
                         print(f'{comp.name=}')
                         if comp.name == 'VTIMEZONE':
                             if 'TZID' in comp:
