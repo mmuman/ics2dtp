@@ -483,6 +483,13 @@ def OpenICalendar():
                                     dtp.statusMessage(_('Skipping event: {0}').format(comp['SUMMARY']))
                                     continue
 
+                            if 'DESCRIPTION' in comp:
+                                paragraphs = comp['DESCRIPTION'].split('\n')
+                                if len(paragraphs):
+                                    # First line is taken as subtitle
+                                    comp.subtitle = paragraphs[0]
+                                    comp.paragraphs = paragraphs[1:]
+
                             events.append(comp)
 
                             # cursor.CharWeight = FontWeight.BOLD
