@@ -20,6 +20,9 @@ import configparser
 # TODO: handle argv[0] to select action from ini file
 #print(sys.argv)
 
+# fake this until we use gettext
+def _(s):
+    return s
 
 #print(f'{calendar.month_name[2]=}')
 #print(f'{calendar.day_name[0]=}')
