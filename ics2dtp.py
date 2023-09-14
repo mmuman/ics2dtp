@@ -430,7 +430,14 @@ def OpenICalendar():
                     cal = icalendar.Calendar.from_ical(data)
                     # FIXME: pass start,end as args
                     #print(str(cal))
-                    period = config['general']['period'].split(" ")
+                    if ('period' in config['general']) and not config['general'].getboolean('confirm_period'):
+                        period = config['general']['period'].split(" ")
+                    else:
+                        period = dtp.valueDialog(_("Period"), _("Period to load"), config.get('general', 'period', fallback="2024-01-01 2024-01-07"))
+                        if len(period) < 1:
+                            dtp.statusMessage(_('Cancelled'))
+                            continue
+                        period = period.split(" ")
                     period = [datetime.fromisoformat(p) for p in period]
                     cal = recurring_ical_events.of(cal, keep_recurrence_attributes=True).between(period[0], period[1])
                     # we get a list, not an enumerator
