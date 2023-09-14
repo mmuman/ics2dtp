@@ -499,51 +499,12 @@ def OpenICalendar():
 
                             events.append(comp)
 
-                            # cursor.CharWeight = FontWeight.BOLD
-                            # text.insertString( cursor, "[%s - %s]" % (start, end), 0 )
-                            # cursor.CharWeight = FontWeight.NORMAL
-                            # cursor.CharPosture = FontSlant.ITALIC
-                            # summary = ""
-                            # if 'SUMMARY' in comp:
-                            #     summary = comp['SUMMARY']
-                            # text.insertString( cursor, " %s\n" % summary, 0 )
-                            # cursor.CharPosture = FontSlant.NONE
-                            # if 'DESCRIPTION' in comp:
-                            #     text.insertString( cursor, "%s\n" % comp['DESCRIPTION'], 0 )
                         else:
                             print("Skipping %s object" % comp.name)
-                    #try:
-                    #    for comp in cal.walk():
-                    #        print comp.name
-                    #except:
-                    #    raise
-                    #    print component
-                    #print(cal.__class__)
-                    #print(cal.property_items())
+
                     statusDone += 100/len(urls)
-                    #status.setValue(statusDone)
                     dtp.progressSet(int(statusDone))
 
-            # sort events in place
-            # events.sort(key=lambda e: e.start)
-            # dtp.enterUndoContext( 'Insert iCalendar' )
-            # for comp in events:
-            #     start = comp.start
-            #     end = comp.end
-            #     cursor.CharWeight = FontWeight.BOLD
-            #     text.insertString( cursor, "[%s - %s]" % (start, end), 0 )
-            #     cursor.CharWeight = FontWeight.NORMAL
-            #     cursor.CharPosture = FontSlant.ITALIC
-            #     summary = ""
-            #     if 'SUMMARY' in comp:
-            #         summary = comp['SUMMARY']
-            #         text.insertString( cursor, " %s\n" % summary, 0 )
-            #         cursor.CharPosture = FontSlant.NONE
-            #     if 'DESCRIPTION' in comp:
-            #         text.insertString( cursor, "%s\n" % comp['DESCRIPTION'], 0 )
-            #     statusDone += 50/len(events)
-            #     status.setValue(statusDone)
-            # dtp.leaveUndoContext()
             dtp.progressEnd()
         else:
             print("cancelled!")
@@ -555,8 +516,10 @@ def OpenICalendar():
         dtp.statusMessage(_('Aborted'))
         dtp.progressEnd()
         raise
-    #text.insertString( cursor, "Fine %s\n" % sys.version, 0 )
-    #print("Fine %s\n" % sys.version)
+
+    # sort events in place
+    events.sort(key=lambda e: e.start_datetime)
+
     return events
 
 
