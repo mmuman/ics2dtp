@@ -455,11 +455,14 @@ def OpenICalendar():
                             print(comp['SUMMARY'])
                             print("Start: %s %s" % (start, type(start)))
                             if isinstance(start, date):
-                                start = datetime.combine(start, datetime.min.time())
+                                start_dt = datetime.combine(start, datetime.min.time())
                             print("End: %s" % end)
-                            comp.start_datetime = start
+                            comp.start_dt = start_dt
                             comp.start = start
+                            if isinstance(end, date):
+                                end_dt = datetime.combine(end, datetime.min.time())
                             comp.end = end
+                            comp.end_dt = end_dt
 
                             if 'categories_summary_match' not in config['source']:
                                 # TODO
@@ -518,7 +521,7 @@ def OpenICalendar():
         raise
 
     # sort events in place
-    events.sort(key=lambda e: e.start_datetime)
+    events.sort(key=lambda e: e.start_dt)
 
     return events
 
@@ -556,18 +559,31 @@ def InsertICalendar( ):
     #text = controller.getViewCursor().getText()
     #cursor = text.createTextCursorByRange(controller.getViewCursor().getStart())
     
-    # sort events in place
-    events.sort(key=lambda e: e.start)
     dtp.enterUndoContext( _('Insert iCalendar') )
     md = ""
+
+    # TODO: sort into categories
+    categories = config['categories'].keys()
+    # eliminate default config keys which appear in all sections
+    categories = filter(lambda x: x not in config_defaults.keys(), categories)
+    if config['source']['categories_uppercase'] == "true": #XXX
+        categories = [str.upper(x) for x in categories]
+        print(categories)
+    for category in categories:
+        if category in config and config[category].getboolean('skip'):
+            continue
+        md += "# %s\n" % config['categories'][category]
+        if category in config and "preamble" in config[category]:
+            md += "%s\n" % config[category]["preamble"]
+
     for comp in events:
-        start = comp.start
+        start = comp.start_dt
         end = comp.end
         # TODO: check Windows: %- -> %# ?
         # https://strftime.org/
         dfmt = "%A %-d %B"
         tfmt = "%-Hh%M"
-        print("XXX:{event.start:%A %-d %B} {event.start:%-Hh%M %-X}//{event.end.minute:d}\u2192{event.end:%-Hh%-0M}".format(event=comp))
+        print("XXX:{event.start:%A %-d %B} {event.start:%-Hh%M %-X}//{event.end_dt.minute:d}\u2192{event.end:%-Hh%-0M}".format(event=comp))
         #cursor.CharWeight = FontWeight.BOLD
         #text.insertString( cursor, "[%s - %s]" % (start, end), 0 )
         #scribus.insertText("[%s - %s]" % (start, end), -1, frame)
