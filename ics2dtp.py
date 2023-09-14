@@ -44,6 +44,7 @@ try:
     from com.sun.star.beans import PropertyValue
     from com.sun.star.lang import XMain
     from com.sun.star.script.provider import XScript
+    from com.sun.star.awt import MessageBoxButtons as MSG_BUTTONS
     #import screen_io as ui
 except (ImportError,NameError) as err:
     #print("No LO API")
@@ -60,6 +61,7 @@ class DTPInterface:
 # https://tmtlakmal.wordpress.com/2013/08/11/a-simple-python-macro-in-libreoffice-4-0/
 # http://hydrogeotools.blogspot.fr/2014/03/libreoffice-and-python-macros.html
 # http://openoffice3.web.fc2.com/Python_Macro_General_No6.html
+# https://wiki.documentfoundation.org/Macros/Python_Guide/Useful_functions
 
 class LibreOfficeInterface(DTPInterface):
     def __init__(self):
@@ -168,6 +170,16 @@ class LibreOfficeInterface(DTPInterface):
         dialog.dispose()
         return ret
 
+    def msgbox(message, title, buttons=MSG_BUTTONS.BUTTONS_OK, type_msg='infobox'):
+        """ Create message box
+            type_msg: infobox, warningbox, errorbox, querybox, messbox
+            https://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1awt_1_1XMessageBoxFactory.html
+        """
+        toolkit = create_instance('com.sun.star.awt.Toolkit')
+        parent = toolkit.getDesktopWindow()
+        mb = toolkit.createMessageBox(parent, type_msg, buttons, title, str(message))
+        return mb.execute()
+
     # TODO
     def InsertText(self, t):
         pass
@@ -208,6 +220,9 @@ class LibreOfficeInterface(DTPInterface):
         self.undos.enterUndoContext(name)
     def leaveUndoContext(self):
         self.undos.leaveUndoContext()
+
+    def messageBox(self, message: str, caption='LibreOffice'):
+        return msgbox(message, caption)
 
     def valueDialog(self, caption: str, message='LibreOffice', defaultvalue = '') -> str:
         #import screen_io as ui
@@ -267,6 +282,9 @@ class ScribusInterface(DTPInterface):
         #TODO: unsupported yet in Scribus
         scribus.docChanged(True)
         pass
+
+    def messageBox(self, message: str, caption='Scribus'):
+        return scribus.messageBox(caption, message)
 
     def valueDialog(self, caption: str, message='Scribus', defaultvalue = '') -> str:
             return scribus.valueDialog(caption, message, defaultvalue)
@@ -408,7 +426,7 @@ def OpenICalendar():
                         dtp.progressSet(int(statusDone+50/2*len(oFiles)))
                 except URLError as e:
                     dtp.statusMessage(_('Error fetching: ') + url)
-                    # TODO: Alert dtp.
+                    dtp.messageBox(_('Error fetching: ') + url)
                     continue
                 if data is not None:
                     cal = icalendar.Calendar.from_ical(data)
