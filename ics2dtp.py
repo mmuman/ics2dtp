@@ -724,15 +724,6 @@ g_exportedScripts = InsertICalendar, InsertICalendarTimeTable,
 
 def main(argv):
     """Application initialization, font checks and initial setup."""
-    #initialisation()
-    #f = scribus.createText(x, y, w, h)
-    aName = "Agenda"
-    dName = "Description"
-    #scribus.insertText("foobar", -1, aName)
-    #scribus.setFont(font, f)
-    #scribus.setFontSize(fontSize, f)
-    #scribus.setLineSpacing(lineSpace, f)
-    #scribus.setTextAlignment(0, f)
     InsertICalendar()
 
 
