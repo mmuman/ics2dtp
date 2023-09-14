@@ -404,28 +404,14 @@ def OpenICalendar():
     events = []
     url = None
     try:
-        # TODO: drop FilePicker stuff?
-        #ctx = uno.getComponentContext()
-        #serviceManager = ctx.ServiceManager
-        #filePicker = serviceManager.createInstance('com.sun.star.ui.dialogs.FilePicker')
-        #filePicker.appendFilter("iCalendar Files (*.ics)", "*.ics")
-        #url = "https://..."
-        url = config['source']['url']
+        urls = [config['source']['url']]
         dtp.statusMessage('Requesting URL: %s' % url)
-        if url is not None:
-            oAccept = 1
-        else:
-            oAccept = filePicker.execute()
-        if oAccept == 1:
-            if url is not None:
-                oFiles = [url]
-            else:
-                oFiles = filePicker.getFiles()
-            statusMax = 100 * len(oFiles)
+        if urls is not None:
+            statusMax = 100 * len(urls)
             dtp.statusMessage(_('Opening...'))
             dtp.progressTotal(statusMax+1)
             dtp.progressSet(0)
-            for url in oFiles:
+            for url in urls:
                 dtp.statusMessage('Processing: ' + url )
                 dtp.progressSet(statusDone)
                 tz = None
@@ -435,7 +421,7 @@ def OpenICalendar():
                     with urllib.request.urlopen(url) as f:
                         #print(f)
                         data = f.read()
-                        dtp.progressSet(int(statusDone+50/2*len(oFiles)))
+                        dtp.progressSet(int(statusDone+50/2*len(urls)))
                 except URLError as e:
                     dtp.statusMessage(_('Error fetching: ') + url)
                     dtp.messageBox(_('Error fetching: ') + url)
@@ -520,7 +506,7 @@ def OpenICalendar():
                     #    print component
                     #print(cal.__class__)
                     #print(cal.property_items())
-                    statusDone += 100/len(oFiles)
+                    statusDone += 100/len(urls)
                     #status.setValue(statusDone)
                     dtp.progressSet(int(statusDone))
 
