@@ -16,6 +16,7 @@ import locale
 import tempfile
 import markdown
 import configparser
+import itertools
 
 # TODO: handle argv[0] to select action from ini file
 #print(sys.argv)
@@ -82,6 +83,7 @@ class LibreOfficeInterface(DTPInterface):
         self.status = self.controller.getFrame().createStatusIndicator()
         #print("status = %s" % str(self.status))
         self.lastStatus = ""
+        self.frame_jump = "\n" # FIXME
     pass
 
     # unused
@@ -245,6 +247,12 @@ class LibreOfficeInterface(DTPInterface):
         #return res[0]
         return reply
 
+    # TODO: handle styles
+
+    # class FontSlant():
+    #     from com.sun.star.awt.FontSlant import (NONE, ITALIC,)
+    # class FontWeight():
+    #     from com.sun.star.awt.FontWeight import (NORMAL, BOLD,)
 
 
 # Scribus scripting references:
@@ -261,6 +269,7 @@ class ScribusInterface(DTPInterface):
     def __init__(self):
         self.scribus = scribus
         print(f'{scribus.getGuiLanguage()=}')
+        self.frame_jump = "\x1a\x1b\n"
 
     # TODO
     def InsertText(self, t):
@@ -344,8 +353,11 @@ except ImportError as err:
     print("Except:%s\n" % (str(sys.exc_info())))
     raise
 
-# sft0c allows referencing the strftime OS-specific modifier to remove leading 0
-config_defaults = {'sft0c': '-' if os.sep == '/' else '#'}
+config_defaults = {
+    # allows referencing the strftime OS-specific modifier to remove leading 0
+    'sft0c': '-' if os.sep == '/' else '#',
+    'dtp_fj': dtp.frame_jump
+    }
 config = configparser.ConfigParser(
     defaults = config_defaults,
     interpolation = configparser.ExtendedInterpolation()
@@ -428,6 +440,15 @@ def OpenICalendar():
                     continue
                 if data is not None:
                     cal = icalendar.Calendar.from_ical(data)
+                    # We must walk it first to get the timezone,
+                    # since recurring_ical_events eats it, and passes multi-days events without time
+                    for comp in cal.walk():
+                        print(comp)
+                        print(f'{comp.name=}')
+                        if comp.name == 'VTIMEZONE':
+                            if 'TZID' in comp:
+                                tz = timezone(comp['TZID'])
+                            print(f'{comp=}')
                     # FIXME: pass start,end as args
                     #print(str(cal))
                     if ('period' in config['general']) and not config['general'].getboolean('confirm_period'):
@@ -452,15 +473,20 @@ def OpenICalendar():
                         elif comp.name == 'VEVENT':
                             start = comp.decoded('DTSTART')
                             end = comp.decoded('DTEND')
+                            start_dt = start
+                            end_dt = end
                             print(comp['SUMMARY'])
                             print("Start: %s %s" % (start, type(start)))
-                            if isinstance(start, date):
-                                start_dt = datetime.combine(start, datetime.min.time())
+                            if not isinstance(start, datetime):
+                                print("ISDATE")
+                                start_dt = tz.localize(datetime.combine(start, datetime.min.time()))
+                                print("StartDT: %s %s" % (start_dt, type(start_dt)))
+                                print(comp)
                             print("End: %s" % end)
                             comp.start_dt = start_dt
                             comp.start = start
-                            if isinstance(end, date):
-                                end_dt = datetime.combine(end, datetime.min.time())
+                            if not isinstance(end, datetime):
+                                end_dt = tz.localize(datetime.combine(end, datetime.min.time()))
                             comp.end = end
                             comp.end_dt = end_dt
 
@@ -482,6 +508,7 @@ def OpenICalendar():
                                         print(comp)
                                         dtp.messageBox(_("Event '{0}' without category, skipping.").format(comp['SUMMARY']))
                                         continue
+                                comp.title = comp['SUMMARY']
 
                                 if comp['CATEGORY'] not in config['categories']:
                                     print(comp)
@@ -493,8 +520,12 @@ def OpenICalendar():
                                     dtp.statusMessage(_('Skipping event: {0}').format(comp['SUMMARY']))
                                     continue
 
+                            comp.subtitle = ""
+                            comp.paragraphs = ""
                             if 'DESCRIPTION' in comp:
                                 paragraphs = comp['DESCRIPTION'].split('\n')
+                                # TODO: filter out:
+                                # TODO: filtrer "(sur inscription.*" vers l'agenda!
                                 if len(paragraphs):
                                     # First line is taken as subtitle
                                     comp.subtitle = paragraphs[0]
@@ -525,27 +556,259 @@ def OpenICalendar():
 
     return events
 
+class ActionHandler:
+    def __init__(self, action):
+        self.action = action
+        self.groups = None
+        if 'groups' in config[self.action]:
+            self.groups = config[self.action]['groups'].split(" ") or []
+
+    def ApplyTransforms(self, group, s):
+        k = "%s_transforms" % group
+        print("TRANS:%s" % k)
+        if k not in config[self.action]:
+            return s
+        transforms = config[self.action][k].split(" ")
+
+        if "capitalize" in transforms:
+            # does not work with ** markdown before name
+            s = s.capitalize()
+        if "title" in transforms:
+            s = s.title()
+        if "newline" in transforms:
+            s += "  \n"
+        if "newparagraph" in transforms:
+            s += "\n\n"
+        return s
+
+    def HandleGroup(self, events, level):
+        md = ""
+        print("HandleGroup(%d)" % level)
+        if level >= len(self.groups):
+            print("level %d > groups!" % level)
+            return
+        group = self.groups[level]
+
+        if group == "items":
+            # sort events in place
+            events.sort(key=lambda e: e.start_dt)
+            for event in events:
+                print()
+                print(event)
+                print(event.__dict__)
+                if not isinstance(event.start, datetime):
+                    s = config[self.action]['items_multi_model'].format(event=event)
+                else:
+                    s = config[self.action]['items_model'].format(event=event)
+                md += self.ApplyTransforms(group, s)
+            #sys.exit(0)
+        elif group == "descriptions":
+            # sort events in place
+            events.sort(key=lambda e: e.start_dt)
+            # find common strings first
+            subtitles = [x.subtitle for x in events]
+            subtitles_done = False
+            print(subtitles)
+            if len(subtitles) == subtitles.count(subtitles[0]):
+                if len(subtitles[0]):
+                    s = config[self.action]['descriptions_subtitle_model'].format(subtitle=subtitles[0])
+                    md += self.ApplyTransforms('descriptions_subtitle', s)
+                subtitles_done = True
+            all_paragraphs = [x.paragraphs for x in events]
+            common_paragraphs = []
+            for i in range(0,len(all_paragraphs[0])):
+                nth_paragraphs = ["" if i >= len(x) else x[i] for x in all_paragraphs]
+                print(nth_paragraphs)
+                if len(nth_paragraphs[0]) < 1:
+                    continue
+                # They are all the same
+                if len(nth_paragraphs) == nth_paragraphs.count(nth_paragraphs[0]):
+                    paragraph = nth_paragraphs[0]
+                    common_paragraphs.append(paragraph)
+                    s = config[self.action]['descriptions_paragraph_model'].format(paragraph=paragraph)
+                    md += self.ApplyTransforms('descriptions_paragraph', s)
+
+
+            for event in events:
+                print()
+                print(event)
+                print(event.__dict__)
+                if not subtitles_done:
+                    subtitle = event.subtitle
+                    s = config[self.action]['descriptions_subtitle_model'].format(subtitle=subtitle)
+                    md += self.ApplyTransforms('descriptions_subtitle', s)
+                for paragraph in event.paragraphs:
+                    if paragraph in common_paragraphs:
+                        # Skip these
+                        continue
+                    s = config[self.action]['descriptions_paragraph_model'].format(paragraph=paragraph)
+                    md += self.ApplyTransforms('descriptions_paragraph', s)
+
+                if not isinstance(event.start, datetime):
+                    s = config[self.action]['descriptions_date_multi_model'].format(event=event)
+                else:
+                    s = config[self.action]['descriptions_date_model'].format(event=event)
+                md += self.ApplyTransforms('descriptions_date', s)
+            #sys.exit(0)
+        elif group == "title":
+            # sort events in place
+            events.sort(key=lambda e: e.title)
+            grouped = itertools.groupby(events, lambda x: x.title)
+            for k, g in grouped:
+                gevents = list(g)
+                title=gevents[0].title
+                s = config[self.action]['title_header'].format(title=title)
+                md += self.ApplyTransforms(group, s)
+                md += self.HandleGroup(gevents, level+1)
+            #sys.exit(0)
+        elif group == "category":
+            categories = config['categories'].keys()
+            # eliminate default config keys which appear in all sections
+            categories = filter(lambda x: x not in config_defaults.keys(), categories)
+            if config['source']['categories_uppercase'] == "true": #XXX
+                categories = [str.upper(x) for x in categories]
+                print(categories)
+
+            for category in categories:
+                if category in config and config[category].getboolean('skip'):
+                    continue
+                gevents = list(filter(lambda x: x['CATEGORY'] == category, events))
+                if len(gevents) or category in config and config[category].getboolean('force'):
+                    preamble=''
+                    if category in config and 'preamble' in config[category]:
+                        preamble = config[category]['preamble']
+                    category_pretty = category
+                    if category in config['categories']:
+                        category_pretty = config['categories'][category]
+                    s = config[self.action]['category_header'].format(category=category, category_pretty=category_pretty, preamble=preamble)
+                    md += self.ApplyTransforms(group, s)
+                    md += self.HandleGroup(gevents, level+1)
+
+            return md
+            #     md += "# %s\n" % config['categories'][category]
+            #     if category in config and "preamble" in config[category]:
+            #         md += "%s\n" % config[category]["preamble"]
+
+            # sort events in place
+            events.sort(key=lambda e: e.start_dt)
+            grouped = itertools.groupby(events, lambda x: categories.index(x['CATEGORY']))
+            for k, g in grouped:
+                gevents = list(g)
+                category = gevents[0]['CATEGORY']
+                category_pretty = category
+                if category in config and config[category].getboolean('skip'):
+                    continue
+                if category in config['categories']:
+                    category_pretty = config['categories'][category]
+                preamble=''
+                if 'preamble' in config[category]:
+                    preamble = config[category]["preamble"]
+
+                s = config[self.action]['category_header'].format(category=category, category_pretty=category_pretty, preamble=preamble)
+                md += self.ApplyTransforms(group, s)
+                md += self.HandleGroup(gevents, level+1)
+
+            #return ""
+        elif group == "month":
+            # sort events in place
+            events.sort(key=lambda e: e.start_dt)
+            grouped = itertools.groupby(events, lambda x: x.start_dt.replace(day=1).date())
+            for k, g in grouped:
+                gevents = list(g)
+                start_dt = gevents[0].start_dt.date()
+                # can't get config parser to keep the ending newline
+                #print("'%s'" % (bytes(config[self.action]['month_header'], "utf-8").decode('string_escape')))
+                s = config[self.action]['month_header'].format(start_dt=start_dt)
+                md += self.ApplyTransforms(group, s)
+                md += self.HandleGroup(gevents, level+1)
+        elif group == "day":
+            # TODO: config: day_multi_first
+            # sort events in place
+            print(len(events))
+            print(events[0].__dict__)
+            events.sort(key=lambda e: e.start_dt)
+            print(len(events))
+            print(events[0].__dict__)
+            # day_multi_first ? -1 if not isinstance(x.start, datetime) else
+            grouped = itertools.groupby(events, lambda x: x.start_dt.date())
+            for k, g in grouped:
+                gevents = list(g)
+                start_dt = gevents[0].start_dt.date()
+                print(start_dt)
+                # can't get config parser to keep the ending newline
+                #print("'%s'" % (bytes(config[self.action]['month_header'], "utf-8").decode('string_escape')))
+                s = config[self.action]['day_header'].format(start_dt=start_dt)
+                md += self.ApplyTransforms(group, s)
+                md += self.HandleGroup(gevents, level+1)
+        else:
+            print("Unknown group type %s" % group)
+            return ""
+
+        return md
+
+    def Handle(self, events):
+        print("Handle()")
+
+        if 'actions' in config[self.action]:
+            actions = config[self.action]['actions'].split(" ")
+            for action in actions:
+                print("Calling handler for action '%s'" % action)
+                handler = ActionHandler(action)
+                handler.Handle(events)
+
+        if 'groups' not in config[self.action]:
+            return
+
+        # Leaf action
+        print("Handle() leaf %s" % self.action)
+        frame = config[self.action]['frame']
+        print(f"{frame=}")
+        md = ""
+
+        statusDone = 0
+        statusMax = 100
+        dtp.progressReset()
+        dtp.progressTotal(statusMax+1)
+        dtp.progressSet(0)
+        dtp.statusMessage(_('Inserting'))
+
+        dtp.enterUndoContext( _('Insert iCalendar') )
+
+        md = self.HandleGroup(events, 0)
+
+        #dtp.progressSet(min(int(statusDone),99))
+        print(md)
+        # Apply post filter TODO: configure this in .ini
+        md = md.replace("h00","h")
+        md = md.replace("*0h\u21920h*","")
+
+        html = markdown.markdown(md)
+        html = '<?xml version="1.0" encoding="utf-8"?><html><head></head><body>%s</body></html>\n' % html
+
+        dtp.insertHtmlText(html, frame)
+        #print(scribus.getPosition())
+        #scribus.insertText("Foo\nbar\n\ntoto", -1, frame)
+        #print(scribus.getPosition())
+        dtp.leaveUndoContext()
+        dtp.progressEnd()
+        return
 
 
 def InsertICalendar( ):
-    #return
-    
-    # class FontSlant():
-    #     from com.sun.star.awt.FontSlant import (NONE, ITALIC,)
-    # class FontWeight():
-    #     from com.sun.star.awt.FontWeight import (NORMAL, BOLD,)
+    events = OpenICalendar()
+
+
+    handler = ActionHandler('general')
+    handler.Handle(events)
+
+
+
+def InsertICalendarOld( ):
 
     frame = agenda_text_block
-    #frame = "Description_test" # XXX:test
-
-    #ret = dtp.valueDialog("Date range", "which date range?", "2023-09-01:2023-09-29")
-    #print("DR: %s" % ret)
 
     events = OpenICalendar()
     
-    #model = XSCRIPTCONTEXT.getDocument()
-    #controller = model.getCurrentController()
-    #status = controller.getFrame().createStatusIndicator()
     statusDone = 0
     statusMax = 100
     dtp.progressReset()
@@ -606,7 +869,6 @@ def InsertICalendar( ):
             #text.insertString( cursor, "%s\n" % comp['DESCRIPTION'], 0 )
             #scribus.insertText("%s\n" % comp['DESCRIPTION'], -1, frame)
             md += "\n%s" % comp['DESCRIPTION']
-            # TODO: filtrer "(sur inscription.*" vers l'agenda!
         statusDone += 50/len(events)
         dtp.progressSet(int(statusDone))
         print(statusDone)
