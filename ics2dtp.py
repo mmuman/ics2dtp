@@ -67,6 +67,75 @@ class DTPInterface:
     #def __init__:
     pass
 
+    def insertRestyledHtmlText(self, html, frame, styles):
+        print("REST")
+        if styles is None:
+            return self.insertHtmlText(html, frame)
+        #print(html)
+        # l = scribus.getTextLength(frame)
+        # scribus.selectText(l, scribus.getTextLength(frame)-l, frame)
+        # #self.setParagraphStyle("04 TITRES CATÉGORIES BLANC SUR COULEUR", frame)
+        # scribus.setStyle("04 TITRES CATÉGORIES BLANC SUR COULEUR", frame)
+        # self.InsertText("Ceci est un test\n", frame)
+        # scribus.selectText(l, scribus.getTextLength(frame)-l, frame)
+        # scribus.setStyle("03 TEXTE NOIR", frame)
+        # #self.setParagraphStyle("03 TEXTE NOIR", frame)
+        # self.InsertText("Ceci est un test aussi\n", frame)
+        # return
+
+        for tline in html.split("<"):
+            if len(tline) < 1:
+                continue
+            [token, text] = tline.split(">")
+            print(f"T: {token}, R: {text}")
+
+            if token[0] is '/' and len(text):
+                print(f"BAD!!!! T: {token}, R: {text}")
+
+            if token == 'br /':
+                self.InsertText(text, frame)
+            elif token == 'p':
+                if token in styles:
+                    self.setParagraphStyle(styles[token], frame)
+                self.InsertText(text, frame)
+            elif token == '/p':
+                self.InsertText(text, frame)
+
+            elif token == 'i':
+                self.InsertText(text, frame)
+                if token in styles:
+                    self.setCharacterStyle(styles[token], frame)
+            elif token == '/i':
+                if token in styles:
+                    self.setCharacterStyle(styles[token], frame)
+                else:
+                    self.setCharacterStyle("", frame)
+                self.InsertText(text, frame)
+
+            elif token in ['b', 'strong']:
+                self.InsertText(text, frame)
+            elif token in ['/b', '/strong']:
+                self.InsertText(text, frame)
+
+            elif token in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                l = token[1]
+                if token in styles:
+                    self.setParagraphStyle(styles[token], frame)
+                self.InsertText(text, frame)
+            elif token in ['/h1', '/h2', '/h3', '/h4', '/h5', '/h6']:
+                l = token[2]
+                if token in styles:
+                    self.setParagraphStyle(styles[token], frame)
+                elif 'p' in styles:
+                    self.setParagraphStyle(styles['p'], frame)
+                else:
+                    self.setParagraphStyle('', frame)
+                self.InsertText(text, frame)
+            else:
+                print(f'UNHANDLED T: {token}, R: {text}')
+                self.InsertText(text, frame)
+
+
 # LibreOffice scripting references:
 # https://wiki.openoffice.org/wiki/Python_as_a_macro_language
 # http://stackoverflow.com/questions/21413664/how-to-run-python-macros-in-libreoffice
@@ -84,6 +153,8 @@ class LibreOfficeInterface(DTPInterface):
         #print("status = %s" % str(self.status))
         self.lastStatus = ""
         self.frame_jump = "\n" # FIXME
+        self.text = self.controller.getViewCursor().getText()
+        self.cursor = self.text.createTextCursorByRange(self.controller.getViewCursor().getStart())
     pass
 
     # unused
@@ -193,8 +264,14 @@ class LibreOfficeInterface(DTPInterface):
         mb = toolkit.createMessageBox(parent, type_msg, buttons, title, str(message))
         return mb.execute()
 
-    # TODO
-    def InsertText(self, t):
+    def setCharacterStyle(self, style, frame):
+        pass
+
+    def setParagraphStyle(self, style, frame):
+        pass
+
+    def InsertText(self, t, frame):
+        self.text.insertString( self.cursor, t, 0 )
         pass
 
     def insertHtmlText(self, html, frame):
@@ -271,8 +348,14 @@ class ScribusInterface(DTPInterface):
         print(f'{scribus.getGuiLanguage()=}')
         self.frame_jump = "\x1a\x1b\n"
 
-    # TODO
-    def InsertText(self, t):
+    def setCharacterStyle(self, style, frame):
+        scribus.setCharacterStyle(style, frame)
+
+    def setParagraphStyle(self, style, frame):
+        scribus.setStyle(style, frame)
+
+    def InsertText(self, t, frame):
+        scribus.insertText(t, -1, frame)
         pass
 
     def insertHtmlText(self, html, frame):
@@ -785,7 +868,19 @@ class ActionHandler:
         html = markdown.markdown(md)
         html = '<?xml version="1.0" encoding="utf-8"?><html><head></head><body>%s</body></html>\n' % html
 
-        dtp.insertHtmlText(html, frame)
+        styles = None
+        if 'styles' in config[self.action]:
+            keys = config[config[self.action]['styles']].keys()
+            # eliminate default config keys which appear in all sections
+            keys = filter(lambda x: x not in config_defaults.keys(), keys)
+            styles = {key:config[config[self.action]['styles']][key] for key in keys}
+            print(f"{styles=}")
+            #sys.exit(1)
+
+
+        #dtp.insertHtmlText(html, frame)
+        dtp.insertRestyledHtmlText(html, frame, styles)
+
         #print(scribus.getPosition())
         #scribus.insertText("Foo\nbar\n\ntoto", -1, frame)
         #print(scribus.getPosition())
