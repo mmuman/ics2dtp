@@ -592,22 +592,23 @@ def OpenICalendar():
                                         comp['SUMMARY'] = m.group("title")
                                     else:
                                         print(comp)
-                                        dtp.messageBox(_("Event '{0}' without category, skipping.").format(comp['SUMMARY']))
+                                        dtp.messageBox(_("{0:%c}:\nEvent '{1}' without category, skipping.").format(comp.start_dt, comp['SUMMARY']))
                                         continue
                                 comp.title = comp['SUMMARY']
 
                                 if comp['CATEGORY'] not in config['categories']:
                                     print(comp)
-                                    dtp.messageBox(_("Event '{0}' in unknown category '{1}'").format(comp['SUMMARY'], comp['CATEGORY']))
+                                    dtp.messageBox(_("{0:%c}:\nEvent '{1}' in unknown category '{2}'").format(comp.start_dt, comp['SUMMARY'], comp['CATEGORY']))
                                     #break
                                     continue
 
                                 if comp['CATEGORY'] in config and config[comp['CATEGORY']].getboolean('skip'):
-                                    dtp.statusMessage(_('Skipping event: {0}').format(comp['SUMMARY']))
+                                    dtp.statusMessage(_('{0:%c}:\nSkipping event: {1}').format(comp.start_dt, comp['SUMMARY']))
                                     continue
                             else:
                                 print("NO SUMM")
-                                dtp.messageBox(_('Event without summary on {0}').format(comp.start_dt))
+                                dtp.messageBox(_('{0:%c}:\nEvent without summary').format(comp.start_dt))
+                                continue
 
                             comp.subtitle = ""
                             comp.paragraphs = ""
