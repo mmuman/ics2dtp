@@ -561,7 +561,7 @@ def OpenICalendar():
                             end = comp.decoded('DTEND')
                             start_dt = start
                             end_dt = end
-                            print(comp['SUMMARY'])
+                            print(comp.get('SUMMARY', 'NO SUMMARY'))
                             print("Start: %s %s" % (start, type(start)))
                             if not isinstance(start, datetime):
                                 print("ISDATE")
@@ -605,6 +605,9 @@ def OpenICalendar():
                                 if comp['CATEGORY'] in config and config[comp['CATEGORY']].getboolean('skip'):
                                     dtp.statusMessage(_('Skipping event: {0}').format(comp['SUMMARY']))
                                     continue
+                            else:
+                                print("NO SUMM")
+                                dtp.messageBox(_('Event without summary on {0}').format(comp.start_dt))
 
                             comp.subtitle = ""
                             comp.paragraphs = ""
