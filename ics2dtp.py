@@ -254,12 +254,15 @@ class LibreOfficeInterface(DTPInterface):
         dialog.dispose()
         return ret
 
-    def msgbox(message, title, buttons=MSG_BUTTONS.BUTTONS_OK, type_msg='infobox'):
+    def msgbox(self, message, title, buttons=MSG_BUTTONS.BUTTONS_OK, type_msg='infobox'):
         """ Create message box
             type_msg: infobox, warningbox, errorbox, querybox, messbox
             https://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1awt_1_1XMessageBoxFactory.html
         """
-        toolkit = create_instance('com.sun.star.awt.Toolkit')
+        def create(name):
+            return ctx.getServiceManager().createInstanceWithContext(name, ctx)
+        ctx = uno.getComponentContext()
+        toolkit = create('com.sun.star.awt.Toolkit')
         parent = toolkit.getDesktopWindow()
         mb = toolkit.createMessageBox(parent, type_msg, buttons, title, str(message))
         return mb.execute()
@@ -312,7 +315,7 @@ class LibreOfficeInterface(DTPInterface):
         self.undos.leaveUndoContext()
 
     def messageBox(self, message: str, caption='LibreOffice'):
-        return msgbox(message, caption)
+        return self.msgbox(message, caption)
 
     def valueDialog(self, caption: str, message='LibreOffice', defaultvalue = '') -> str:
         #import screen_io as ui
